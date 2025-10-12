@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub struct GitLauncherConfig {
-    base_dir: Vec<String>,
-    ignore_dirs: Vec<String>,
+    pub base_dir: Vec<String>,
+    pub ignore_dirs: Vec<String>,
 }
 
 impl Default for GitLauncherConfig {
