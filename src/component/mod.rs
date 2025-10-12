@@ -9,7 +9,6 @@ use gpui_component::{
     input::{InputEvent, InputState, TextInput},
     v_flex,
 };
-use std::cmp::max;
 
 mod repo_list;
 
@@ -23,6 +22,12 @@ pub struct GitLauncher {
 }
 
 impl EventEmitter<InputEvent> for GitLauncher {}
+
+impl Focusable for GitLauncher {
+    fn focus_handle(&self, cx: &App) -> FocusHandle {
+        self.input.focus_handle(cx)
+    }
+}
 
 impl GitLauncher {
     pub fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
