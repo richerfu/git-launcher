@@ -1,3 +1,7 @@
+mod search_repo;
+
+pub use search_repo::*;
+
 #[derive(Debug, Clone)]
 pub struct Repo {
     pub name: String,

@@ -1,13 +1,17 @@
-use crate::component::GitLauncher;
+use crate::{
+    component::GitLauncher,
+    repo::{GitProjectFinder, Repo},
+};
 use global_hotkey::{
     GlobalHotKeyEvent, GlobalHotKeyManager,
     hotkey::{Code, HotKey, Modifiers},
 };
 use gpui::*;
 use gpui_component::Root;
-use std::sync::{Arc, Mutex, mpsc};
-use std::thread::spawn;
-use std::time::Duration;
+use std::{path::Path, sync::mpsc};
+use std::{sync::LazyLock, time::Duration};
+use std::{sync::RwLock, thread::spawn};
+use tokio::runtime::Runtime;
 
 mod assets;
 mod component;
@@ -16,19 +20,53 @@ mod repo;
 
 actions!(git_launcher, [Quit, ShowWindow]);
 
-#[derive(Clone)]
+pub(crate) static GLOBAL_APP_STATE: LazyLock<RwLock<AppState>> =
+    LazyLock::new(|| RwLock::new(AppState::new()));
+
+pub(crate) static GLOBAL_RUNTIME: LazyLock<Runtime> = LazyLock::new(|| Runtime::new().unwrap());
+
 struct AppState {
-    hot_key_manager: Arc<GlobalHotKeyManager>,
-    window_handle: Arc<Mutex<Option<WindowHandle<Root>>>>,
+    hot_key_manager: GlobalHotKeyManager,
+    window_handle: Option<WindowHandle<Root>>,
+    repo_finder: GitProjectFinder,
+    repos: Vec<Repo>,
 }
 
 impl AppState {
     fn new() -> Self {
         let manager = GlobalHotKeyManager::new().expect("Failed to create hotkey manager");
+
+        let repo_finder = GitProjectFinder::builder()
+            .ignore_dirs(["node_modules", "target", ".git", "build", "dist"])
+            .ignore_dir("vendor")
+            .ignore_dir("cache")
+            .ignore_dir("tmp")
+            .max_depth(6)
+            .max_concurrent_tasks(15)
+            .build();
+
         Self {
-            hot_key_manager: Arc::new(manager),
-            window_handle: Arc::new(Mutex::new(None)),
+            hot_key_manager: manager,
+            window_handle: None,
+            repo_finder: repo_finder,
+            repos: Vec::new(),
         }
+    }
+
+    pub async fn fresh_repos(
+        &mut self,
+        root_path: impl AsRef<Path>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let ret = self.repo_finder.find_git_projects(root_path).await?;
+        for repo in ret {
+            self.repos.push(Repo {
+                name: repo.folder_name,
+                path: repo.full_path.to_string_lossy().to_string().clone(),
+                language: String::from("test"),
+                count: 0,
+            });
+        }
+        Ok(())
     }
 
     fn register_global_hotkeys(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -37,12 +75,12 @@ impl AppState {
         Ok(())
     }
 
-    fn set_window_handle(&self, handle: WindowHandle<Root>) {
-        *self.window_handle.lock().unwrap() = Some(handle);
+    fn set_window_handle(&mut self, handle: WindowHandle<Root>) {
+        self.window_handle = Some(handle);
     }
 
     fn show_window(&self, app: &mut App) {
-        if let Some(handle) = self.window_handle.lock().unwrap().as_ref() {
+        if let Some(handle) = self.window_handle.as_ref() {
             handle
                 .update(app, |root, window, cx| {
                     let git_launcher = root.view().clone().downcast::<GitLauncher>().unwrap();
@@ -58,10 +96,12 @@ impl AppState {
 fn main() {
     let app = Application::new().with_assets(assets::Assets);
 
-    let mut app_state = AppState::new();
-    app_state
-        .register_global_hotkeys()
-        .expect("Failed to register global hotkeys");
+    {
+        let mut app_state = GLOBAL_APP_STATE.write().unwrap();
+        app_state
+            .register_global_hotkeys()
+            .expect("Failed to register global hotkeys");
+    }
 
     app.run(move |cx| {
         let (tx, rx) = mpsc::channel::<()>();
@@ -69,7 +109,7 @@ fn main() {
         spawn(move || {
             loop {
                 match GlobalHotKeyEvent::receiver().try_recv() {
-                    Ok(event) => {
+                    Ok(_) => {
                         if let Err(_) = tx.send(()) {
                             break;
                         }
@@ -86,17 +126,27 @@ fn main() {
 
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
 
-        let app_state_clone = app_state.clone();
         cx.on_action(move |_: &ShowWindow, cx: &mut App| {
-            app_state_clone.show_window(cx);
+            let app_state = GLOBAL_APP_STATE.read().unwrap();
+            app_state.show_window(cx);
         });
 
         cx.on_action(|_: &Quit, cx: &mut App| cx.quit());
 
         cx.activate(true);
 
-        let app_state_for_hotkey = app_state.clone();
-        cx.spawn(async move |mut cx| {
+        cx.spawn(async move |_| {
+            GLOBAL_RUNTIME.block_on(async move {
+                let mut app_state = GLOBAL_APP_STATE.write().unwrap();
+                app_state
+                    .fresh_repos(Path::new("/Users/ranger/Desktop/project"))
+                    .await
+                    .expect("failed to fresh repos");
+            });
+        })
+        .detach();
+
+        cx.spawn(async move |cx| {
             loop {
                 match rx.try_recv() {
                     Ok(_) => {
@@ -118,9 +168,8 @@ fn main() {
         })
         .detach();
 
-        let app_state_for_window = app_state.clone();
         cx.spawn(async move |cx| {
-            let (window_size, window_bounds) = cx.update(|cx| {
+            let (_, window_bounds) = cx.update(|cx| {
                 let mut window_size = size(px(config.ui_config.width), px(config.ui_config.height));
 
                 if let Some(display) = cx.primary_display() {
@@ -167,7 +216,8 @@ fn main() {
                 })
                 .expect("failed to open window");
 
-            app_state_for_window.set_window_handle(window.clone());
+            let mut app_state = GLOBAL_APP_STATE.write().unwrap();
+            app_state.set_window_handle(window.clone());
 
             window
                 .update(cx, |_, window, cx| {

@@ -1,11 +1,11 @@
+use crate::GLOBAL_APP_STATE;
 use crate::component::repo_list::ITEM_HEIGHT;
 use crate::repo::Repo;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::divider::Divider;
-use gpui_component::scroll::{Scrollbar, ScrollbarAxis};
 use gpui_component::{
-    ActiveTheme, Icon, IconName, Sizable, StyledExt, h_flex,
+    ActiveTheme, Icon, IconName, Sizable, StyledExt,
     input::{InputEvent, InputState, TextInput},
     v_flex,
 };
@@ -56,11 +56,16 @@ impl GitLauncher {
                     let _ = window_handle.update(ctx, |_, window: &mut Window, _| {
                         window.resize(size(px(600.), px(height)));
                     });
+
                     this.search = text.to_string().clone();
-                    this.result.push(Repo {
-                        name: format!("Git Launcher item #{}", this.result.len() + 1),
-                        ..Default::default()
-                    });
+
+                    let app_state = GLOBAL_APP_STATE.read().unwrap();
+                    this.result = app_state
+                        .repos
+                        .iter()
+                        .filter(|repo| repo.name.contains(&this.search))
+                        .cloned()
+                        .collect();
                 }
                 InputEvent::Blur => {
                     ctx.hide();
