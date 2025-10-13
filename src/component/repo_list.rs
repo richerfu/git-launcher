@@ -19,7 +19,7 @@ impl Render for RepoItem {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         h_flex()
             .gap_2()
-            .child(img("languages/default.svg").size_4())
+            .child(self.data.language.clone())
             .child(
                 v_flex()
                     .child(div().child(self.data.name.clone()).text_size(px(16.)))

@@ -1,5 +1,4 @@
 use futures::stream::{self, StreamExt};
-use gpui::App;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -54,7 +53,7 @@ impl GitProjectFinder {
     pub async fn find_git_projects(
         &self,
         root_path: impl AsRef<Path>,
-    ) -> Result<Vec<GitProject>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> anyhow::Result<Vec<GitProject>, anyhow::Error> {
         let root = root_path.as_ref().to_path_buf();
 
         // 使用通道收集结果
@@ -95,7 +94,7 @@ impl GitProjectFinder {
         dir_path: PathBuf,
         current_depth: usize,
         tx: mpsc::UnboundedSender<GitProject>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> anyhow::Result<(), anyhow::Error> {
         // 检查深度限制
         if let Some(max_depth) = self.config.max_depth {
             if current_depth > max_depth {
@@ -194,7 +193,7 @@ impl GitProjectFinder {
     async fn filter_submodules(
         &self,
         projects: Vec<GitProject>,
-    ) -> Result<Vec<GitProject>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> anyhow::Result<Vec<GitProject>, anyhow::Error> {
         // 使用 stream 并发检查所有项目
         let futures = projects.into_iter().map(|project| async move {
             if self.is_submodule(&project.full_path).await {

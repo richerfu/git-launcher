@@ -1,6 +1,6 @@
 use crate::{
     component::GitLauncher,
-    repo::{GitProjectFinder, Repo},
+    repo::{GitProjectFinder, LanguageAnalyzer, Repo},
 };
 use global_hotkey::{
     GlobalHotKeyEvent, GlobalHotKeyManager,
@@ -56,15 +56,19 @@ impl AppState {
     pub async fn fresh_repos(
         &mut self,
         root_path: impl AsRef<Path>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> anyhow::Result<(), anyhow::Error> {
         let ret = self.repo_finder.find_git_projects(root_path).await?;
         for repo in ret {
-            self.repos.push(Repo {
+            let mut repo = Repo {
                 name: repo.folder_name,
                 path: repo.full_path.to_string_lossy().to_string().clone(),
                 language: String::from("test"),
                 count: 0,
-            });
+            };
+            let stats = LanguageAnalyzer::new(repo.path.as_str()).language().await?;
+            repo.language = stats.0;
+
+            self.repos.push(repo);
         }
         Ok(())
     }

@@ -1,5 +1,7 @@
+mod language;
 mod search_repo;
 
+pub use language::*;
 pub use search_repo::*;
 
 #[derive(Debug, Clone)]
