@@ -17,6 +17,7 @@ mod assets;
 mod component;
 mod config;
 mod repo;
+mod system;
 
 actions!(git_launcher, [Quit, ShowWindow]);
 
@@ -60,13 +61,13 @@ impl AppState {
         let ret = self.repo_finder.find_git_projects(root_path).await?;
         for repo in ret {
             let mut repo = Repo {
-                name: repo.folder_name,
+                name: repo.folder_name.clone(),
                 path: repo.full_path.to_string_lossy().to_string().clone(),
-                language: String::from("test"),
+                language: String::from("unknown"),
                 count: 0,
             };
-            let stats = LanguageAnalyzer::new(repo.path.as_str()).language().await?;
-            repo.language = stats.0;
+            // let stats = LanguageAnalyzer::new(repo.path.as_str()).language().await?;
+            // repo.language = stats.0;
 
             self.repos.push(repo);
         }

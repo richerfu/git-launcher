@@ -2,12 +2,12 @@ use crate::repo::Repo;
 use gpui::*;
 use gpui_component::{ActiveTheme, h_flex, v_flex};
 
+pub const ITEM_HEIGHT: f32 = 75.;
+
 #[derive(Debug, Clone)]
 pub struct RepoItem {
     data: Repo,
 }
-
-pub const ITEM_HEIGHT: f32 = 75.;
 
 impl RepoItem {
     pub fn new(data: Repo) -> Self {
@@ -16,7 +16,7 @@ impl RepoItem {
 }
 
 impl Render for RepoItem {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         h_flex()
             .gap_2()
             .child(self.data.language.clone())

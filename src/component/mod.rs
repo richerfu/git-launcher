@@ -1,6 +1,7 @@
 use crate::GLOBAL_APP_STATE;
 use crate::component::repo_list::ITEM_HEIGHT;
 use crate::repo::Repo;
+use crate::system::FileOpener;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::divider::Divider;
@@ -81,6 +82,12 @@ impl GitLauncher {
             search: String::new(),
         }
     }
+
+    fn click(_: &ClickEvent, _: &mut Window, _: &mut App, repo: Repo) {
+        let _ = FileOpener::open_with("/Applications/Cursor.app", repo.path.as_str()).unwrap();
+
+        println!("click: {:?}", repo);
+    }
 }
 
 impl Render for GitLauncher {
@@ -114,11 +121,16 @@ impl Render for GitLauncher {
                 this.child(Divider::horizontal())
                     .child(
                         v_flex()
-                            .children(
-                                self.result
-                                    .iter()
-                                    .map(|repo| cx.new(|_| repo_list::RepoItem::new(repo.clone()))),
-                            )
+                            .children(self.result.iter().map(|repo| {
+                                let data = repo.clone();
+                                let id: SharedString = repo.path.clone().into();
+                                div()
+                                    .id(id)
+                                    .on_click(move |evt, win, cx| {
+                                        Self::click(evt, win, cx, data.clone());
+                                    })
+                                    .child(cx.new(|_| repo_list::RepoItem::new(repo.clone())))
+                            }))
                             .mt_1()
                             .pb_1()
                             .when(self.result.len() > MAX_ITEM_COUNT, |this| {
