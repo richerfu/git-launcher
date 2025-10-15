@@ -1,3 +1,7 @@
 /target
 .idea
 .DS_Store
+
+*.dmg
+Git Launcher.app/
+.cargo-packager/

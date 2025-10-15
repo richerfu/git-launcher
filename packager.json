@@ -1,0 +1,14 @@
+{
+    "$schema": "./schema.json",
+    "identifier": "com.richerfu.git-launcher",
+    "name": "Git Launcher",
+    "version": "0.1.0",
+    "authors": ["richerfu"],
+    "icons": ["assets/logo/32x32.png"],
+    "binaries": [{
+        "path": "target/debug/git_launcher",
+        "main": true
+    }],
+    "productName": "Git Launcher",
+    "beforePackagingCommand": "cargo build"
+}
