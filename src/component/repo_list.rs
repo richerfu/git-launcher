@@ -1,4 +1,4 @@
-use crate::repo::Repo;
+use crate::repo::{Repo, get_language_icon};
 use gpui::*;
 use gpui_component::{ActiveTheme, h_flex, v_flex};
 
@@ -17,9 +17,15 @@ impl RepoItem {
 
 impl Render for RepoItem {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let lang: SharedString = format!(
+            "languages/{}.png",
+            get_language_icon(self.data.language.clone().as_str())
+        )
+        .into();
+
         h_flex()
-            .gap_2()
-            .child(self.data.language.clone())
+            .gap_3()
+            .child(img(lang).size_6())
             .child(
                 v_flex()
                     .child(div().child(self.data.name.clone()).text_size(px(16.)))

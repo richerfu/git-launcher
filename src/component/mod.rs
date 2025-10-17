@@ -1,6 +1,8 @@
+use std::thread::spawn;
+
 use crate::GLOBAL_APP_STATE;
 use crate::component::repo_list::ITEM_HEIGHT;
-use crate::repo::Repo;
+use crate::repo::{LanguageAnalyzer, Repo};
 use crate::system::FileOpener;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
@@ -90,12 +92,26 @@ impl GitLauncher {
         cx: &mut Context<Self>,
         repo: Repo,
     ) {
+        cx.hide();
         Self::open_repo(repo);
         Self::clear_search(self, evt, window, cx);
     }
 
     fn open_repo(repo: Repo) {
         let _ = FileOpener::open_with("/Applications/Cursor.app", repo.path.as_str()).unwrap();
+        let path = repo.path.clone();
+        spawn(move || {
+            let analyzer = LanguageAnalyzer::new(path.as_str());
+            let stats = analyzer.language().unwrap();
+
+            let mut app_state = GLOBAL_APP_STATE.write().unwrap();
+            let r = app_state.repos.iter_mut().find(|r| r.path == path).unwrap();
+
+            r.language = stats.0;
+            r.count += 1;
+        })
+        .join()
+        .unwrap();
     }
 
     fn clear_search(self: &mut Self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
