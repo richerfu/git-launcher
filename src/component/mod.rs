@@ -83,10 +83,28 @@ impl GitLauncher {
         }
     }
 
-    fn click(_: &ClickEvent, _: &mut Window, _: &mut App, repo: Repo) {
-        let _ = FileOpener::open_with("/Applications/Cursor.app", repo.path.as_str()).unwrap();
+    fn click(
+        self: &mut Self,
+        evt: &ClickEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        repo: Repo,
+    ) {
+        Self::open_repo(repo);
+        Self::clear_search(self, evt, window, cx);
+    }
 
-        println!("click: {:?}", repo);
+    fn open_repo(repo: Repo) {
+        let _ = FileOpener::open_with("/Applications/Cursor.app", repo.path.as_str()).unwrap();
+    }
+
+    fn clear_search(self: &mut Self, _: &ClickEvent, window: &mut Window, cx: &mut Context<Self>) {
+        self.search = String::new();
+        self.result = vec![];
+
+        self.input.update(cx, |state, cx| {
+            state.set_value(String::new(), window, cx);
+        });
     }
 }
 
@@ -110,10 +128,15 @@ impl Render for GitLauncher {
                     )
                     .when(self.search.len() > 0, |this| {
                         this.suffix(
-                            Icon::new(IconName::CircleX)
-                                .size_4()
-                                .text_color(cx.theme().muted_foreground)
-                                .cursor_pointer(),
+                            div()
+                                .id("clear-search")
+                                .on_click(cx.listener(Self::clear_search))
+                                .child(
+                                    Icon::new(IconName::CircleX)
+                                        .size_4()
+                                        .text_color(cx.theme().muted_foreground)
+                                        .cursor_pointer(),
+                                ),
                         )
                     }),
             )
@@ -126,9 +149,9 @@ impl Render for GitLauncher {
                                 let id: SharedString = repo.path.clone().into();
                                 div()
                                     .id(id)
-                                    .on_click(move |evt, win, cx| {
-                                        Self::click(evt, win, cx, data.clone());
-                                    })
+                                    .on_click(cx.listener(move |item, evt, win, cx| {
+                                        Self::click(item, evt, win, cx, data.clone());
+                                    }))
                                     .child(cx.new(|_| repo_list::RepoItem::new(repo.clone())))
                             }))
                             .mt_1()
