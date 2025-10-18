@@ -1,8 +1,7 @@
 use std::thread::spawn;
 
-use crate::GLOBAL_APP_STATE;
 use crate::component::repo_list::ITEM_HEIGHT;
-use crate::repo::{LanguageAnalyzer, Repo};
+use crate::repo::{LanguageAnalyzer, Repo, RepoState};
 use crate::system::FileOpener;
 use gpui::prelude::FluentBuilder;
 use gpui::*;
@@ -43,7 +42,7 @@ impl GitLauncher {
 
         let _sub = vec![cx.subscribe(
             &input,
-            move |this, _, event: &InputEvent, ctx| match event {
+            move |this, _, event: &InputEvent, ctx: &mut Context<Self>| match event {
                 InputEvent::Change => {
                     let text = this.input.read(ctx).value();
                     let mut height = if text.len() > 0 {
@@ -62,9 +61,11 @@ impl GitLauncher {
 
                     this.search = text.to_string().clone();
 
-                    let app_state = GLOBAL_APP_STATE.read().unwrap();
-                    this.result = app_state
-                        .repos
+                    let repos = ctx.read_global(|state: &RepoState, _: &App| state.repos.clone());
+
+                    let repo_state = repos.read().unwrap();
+
+                    this.result = repo_state
                         .iter()
                         .filter(|repo| repo.name.contains(&this.search))
                         .cloned()
@@ -93,19 +94,23 @@ impl GitLauncher {
         repo: Repo,
     ) {
         cx.hide();
-        Self::open_repo(repo);
+        Self::open_repo(repo, cx);
         Self::clear_search(self, evt, window, cx);
     }
 
-    fn open_repo(repo: Repo) {
+    fn open_repo(repo: Repo, cx: &mut Context<Self>) {
         let _ = FileOpener::open_with("/Applications/Cursor.app", repo.path.as_str()).unwrap();
         let path = repo.path.clone();
+
+        let repos = cx.read_global(|state: &RepoState, _: &App| state.repos.clone());
+
         spawn(move || {
             let analyzer = LanguageAnalyzer::new(path.as_str());
             let stats = analyzer.language().unwrap();
 
-            let mut app_state = GLOBAL_APP_STATE.write().unwrap();
-            let r = app_state.repos.iter_mut().find(|r| r.path == path).unwrap();
+            let mut repo_state = repos.write().unwrap();
+
+            let r = repo_state.iter_mut().find(|r| r.path == path).unwrap();
 
             r.language = stats.0;
             r.count += 1;

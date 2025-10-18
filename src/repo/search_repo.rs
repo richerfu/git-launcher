@@ -5,6 +5,8 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::{Semaphore, mpsc};
 
+use crate::config::GitLauncherConfig;
+
 #[derive(Debug, Clone)]
 pub struct GitProject {
     pub full_path: PathBuf,
@@ -18,19 +20,12 @@ pub struct GitFinderConfig {
     pub max_concurrent_tasks: usize,
 }
 
-impl Default for GitFinderConfig {
-    fn default() -> Self {
-        let mut ignored_dirs = HashSet::new();
-        ignored_dirs.insert("node_modules".to_string());
-        ignored_dirs.insert("target".to_string());
-        ignored_dirs.insert(".git".to_string());
-        ignored_dirs.insert("build".to_string());
-        ignored_dirs.insert("dist".to_string());
-
+impl GitFinderConfig {
+    pub fn new(config: GitLauncherConfig) -> Self {
         Self {
-            ignored_dirs,
-            max_depth: Some(10),
-            max_concurrent_tasks: 20,
+            ignored_dirs: config.ignore_dirs.into_iter().collect(),
+            max_depth: Some(config.max_depth),
+            max_concurrent_tasks: config.max_concurrent_tasks,
         }
     }
 }
@@ -233,8 +228,8 @@ impl GitProjectFinder {
 }
 
 impl GitProjectFinder {
-    pub fn builder() -> GitFinderConfigBuilder {
-        GitFinderConfigBuilder::new()
+    pub fn builder(config: GitLauncherConfig) -> GitFinderConfigBuilder {
+        GitFinderConfigBuilder::new(config)
     }
 }
 
@@ -245,11 +240,11 @@ pub struct GitFinderConfigBuilder {
 }
 
 impl GitFinderConfigBuilder {
-    pub fn new() -> Self {
+    pub fn new(config: GitLauncherConfig) -> Self {
         Self {
-            ignored_dirs: HashSet::new(),
-            max_depth: Some(10),
-            max_concurrent_tasks: 20,
+            ignored_dirs: config.ignore_dirs.into_iter().collect(),
+            max_depth: Some(config.max_depth),
+            max_concurrent_tasks: config.max_concurrent_tasks,
         }
     }
 

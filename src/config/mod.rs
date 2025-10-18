@@ -1,3 +1,4 @@
+use anyhow::Ok;
 use gpui::*;
 
 mod repo_config;
@@ -13,11 +14,15 @@ pub struct Config {
 }
 
 // init config with default or config file
-pub fn init(cx: &mut App) -> Result<Config, anyhow::Error> {
+pub fn init(cx: &mut App) -> Result<(), anyhow::Error> {
     let config = Config {
         repo_config: GitLauncherConfig::default(),
         ui_config: GitLauncherUIConfig::default(),
     };
 
-    Ok(config)
+    cx.set_global(config);
+
+    Ok(())
 }
+
+impl Global for Config {}

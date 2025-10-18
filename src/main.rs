@@ -1,6 +1,7 @@
 use crate::{
     component::GitLauncher,
-    repo::{GitProjectFinder, LanguageAnalyzer, Repo},
+    config::Config,
+    repo::{GitProjectFinder, Repo, RepoState},
 };
 use global_hotkey::{
     GlobalHotKeyEvent, GlobalHotKeyManager,
@@ -29,49 +30,15 @@ pub(crate) static GLOBAL_RUNTIME: LazyLock<Runtime> = LazyLock::new(|| Runtime::
 struct AppState {
     hot_key_manager: GlobalHotKeyManager,
     window_handle: Option<WindowHandle<Root>>,
-    repo_finder: GitProjectFinder,
-    repos: Vec<Repo>,
 }
 
 impl AppState {
     fn new() -> Self {
         let manager = GlobalHotKeyManager::new().expect("Failed to create hotkey manager");
-
-        let repo_finder = GitProjectFinder::builder()
-            .ignore_dirs(["node_modules", "target", ".git", "build", "dist"])
-            .ignore_dir("vendor")
-            .ignore_dir("cache")
-            .ignore_dir("tmp")
-            .max_depth(6)
-            .max_concurrent_tasks(15)
-            .build();
-
         Self {
             hot_key_manager: manager,
             window_handle: None,
-            repo_finder: repo_finder,
-            repos: Vec::new(),
         }
-    }
-
-    pub async fn fresh_repos(
-        &mut self,
-        root_path: impl AsRef<Path>,
-    ) -> anyhow::Result<(), anyhow::Error> {
-        let ret = self.repo_finder.find_git_projects(root_path).await?;
-        for repo in ret {
-            let mut repo = Repo {
-                name: repo.folder_name.clone(),
-                path: repo.full_path.to_string_lossy().to_string().clone(),
-                language: String::from("unknown"),
-                count: 0,
-            };
-            // let stats = LanguageAnalyzer::new(repo.path.as_str()).language().await?;
-            // repo.language = stats.0;
-
-            self.repos.push(repo);
-        }
-        Ok(())
     }
 
     fn register_global_hotkeys(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -127,7 +94,8 @@ fn main() {
         });
 
         gpui_component::init(cx);
-        let config = config::init(cx).expect("failed to init config");
+        config::init(cx).expect("failed to init config");
+        repo::init(cx).expect("failed to init repo");
 
         cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
 
@@ -140,14 +108,36 @@ fn main() {
 
         cx.activate(true);
 
-        cx.spawn(async move |_| {
+        cx.spawn(async move |cx| {
+            let config = cx
+                .read_global(|state: &Config, _: &App| state.repo_config.clone())
+                .unwrap();
+
             GLOBAL_RUNTIME.block_on(async move {
-                let mut app_state = GLOBAL_APP_STATE.write().unwrap();
-                app_state
-                    .fresh_repos(Path::new("/Users/ranger/Desktop/project"))
-                    .await
-                    .expect("failed to fresh repos");
+                let repo_finder = GitProjectFinder::builder(config.clone()).build();
+
+                for dir in config.base_dir.clone() {
+                    let repos = repo_finder
+                        .find_git_projects(Path::new(&dir.clone()))
+                        .await
+                        .unwrap();
+
+                    cx.update_global(|state: &mut RepoState, _: &mut App| {
+                        let mut repo_state = state.repos.write().unwrap();
+                        for repo in repos {
+                            repo_state.push(Repo {
+                                name: repo.folder_name.clone(),
+                                path: repo.full_path.to_string_lossy().to_string().clone(),
+                                language: String::from("unknown"),
+                                count: 0,
+                            });
+                        }
+                    })
+                    .unwrap();
+                }
             });
+
+            Ok::<_, anyhow::Error>(())
         })
         .detach();
 
@@ -174,7 +164,11 @@ fn main() {
         .detach();
 
         cx.spawn(async move |cx| {
+            let config = cx
+                .read_global(|state: &Config, _: &App| state.ui_config)
+                .unwrap();
             let (_, window_bounds) = cx.update(|cx| {
+                let config = cx.global::<Config>();
                 let mut window_size = size(px(config.ui_config.width), px(config.ui_config.height));
 
                 if let Some(display) = cx.primary_display() {
@@ -202,8 +196,8 @@ fn main() {
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(window_bounds)),
                 window_min_size: Some(gpui::Size {
-                    width: px(config.ui_config.width),
-                    height: px(config.ui_config.height),
+                    width: px(config.width),
+                    height: px(config.height),
                 }),
                 titlebar: None,
                 kind: WindowKind::Normal,
@@ -225,7 +219,7 @@ fn main() {
             app_state.set_window_handle(window.clone());
 
             window
-                .update(cx, |_, window, cx| {
+                .update(cx, |_, window, _| {
                     window.set_window_title("Git Launcher");
                     window.activate_window();
                 })
