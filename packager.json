@@ -5,9 +5,9 @@
     "version": "0.1.0",
     "authors": ["richerfu"],
     "binaries": [{
-        "path": "target/debug/git_launcher",
+        "path": "target/release/git_launcher",
         "main": true
     }],
     "productName": "Git Launcher",
-    "beforePackagingCommand": "cargo build"
+    "beforePackagingCommand": "cargo build --release"
 }
