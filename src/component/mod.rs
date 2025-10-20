@@ -1,6 +1,7 @@
 use std::thread::spawn;
 
 use crate::component::repo_list::ITEM_HEIGHT;
+use crate::config::Config;
 use crate::repo::{LanguageAnalyzer, Repo, RepoState};
 use crate::system::FileOpener;
 use gpui::prelude::FluentBuilder;
@@ -99,7 +100,8 @@ impl GitLauncher {
     }
 
     fn open_repo(repo: Repo, cx: &mut Context<Self>) {
-        let _ = FileOpener::open_with("/Applications/Cursor.app", repo.path.as_str()).unwrap();
+        let editor = cx.read_global(|state: &Config, _: &App| state.editor_config.clone());
+        let _ = FileOpener::open_with(editor.editor.as_str(), repo.path.as_str()).unwrap();
         let path = repo.path.clone();
 
         let repos = cx.read_global(|state: &RepoState, _: &App| state.repos.clone());

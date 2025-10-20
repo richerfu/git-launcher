@@ -1,6 +1,6 @@
 use crate::{
     component::GitLauncher,
-    config::Config,
+    config::{Config, REPO_PATH},
     repo::{GitProjectFinder, Repo, RepoState},
 };
 use global_hotkey::{
@@ -9,7 +9,7 @@ use global_hotkey::{
 };
 use gpui::*;
 use gpui_component::Root;
-use std::{path::Path, sync::mpsc};
+use std::{fs, path::Path, sync::mpsc};
 use std::{sync::LazyLock, time::Duration};
 use std::{sync::RwLock, thread::spawn};
 use tokio::runtime::Runtime;
@@ -113,29 +113,79 @@ fn main() {
                 .read_global(|state: &Config, _: &App| state.repo_config.clone())
                 .unwrap();
 
-            GLOBAL_RUNTIME.block_on(async move {
-                let repo_finder = GitProjectFinder::builder(config.clone()).build();
+            let content = fs::read_to_string(REPO_PATH.clone()).unwrap();
 
-                for dir in config.base_dir.clone() {
-                    let repos = repo_finder
-                        .find_git_projects(Path::new(&dir.clone()))
-                        .await
+            if content.is_empty() {
+                GLOBAL_RUNTIME.block_on(async move {
+                    let repo_finder = GitProjectFinder::builder(config.clone()).build();
+
+                    for dir in config.base_dir.clone() {
+                        let repos = repo_finder
+                            .find_git_projects(Path::new(&dir.clone()))
+                            .await
+                            .unwrap();
+
+                        cx.update_global(|state: &mut RepoState, _: &mut App| {
+                            let mut repo_state = state.repos.write().unwrap();
+                            for repo in repos {
+                                repo_state.push(Repo {
+                                    name: repo.folder_name.clone(),
+                                    path: repo.full_path.to_string_lossy().to_string().clone(),
+                                    language: String::from("unknown"),
+                                    count: 0,
+                                });
+                            }
+                        })
+                        .unwrap();
+                    }
+
+                    let repo_state = cx
+                        .read_global(|state: &RepoState, _: &App| state.repos.clone())
                         .unwrap();
 
-                    cx.update_global(|state: &mut RepoState, _: &mut App| {
-                        let mut repo_state = state.repos.write().unwrap();
-                        for repo in repos {
-                            repo_state.push(Repo {
-                                name: repo.folder_name.clone(),
-                                path: repo.full_path.to_string_lossy().to_string().clone(),
-                                language: String::from("unknown"),
-                                count: 0,
-                            });
+                    fs::write(
+                        REPO_PATH.clone(),
+                        serde_json::to_string(&repo_state).unwrap(),
+                    )
+                    .unwrap();
+                });
+            } else {
+                let repo_state = fs::read_to_string(REPO_PATH.clone()).unwrap();
+                let repos: Vec<Repo> = serde_json::from_str(&repo_state).unwrap();
+                cx.update_global(|state: &mut RepoState, _: &mut App| {
+                    let mut repo_state = state.repos.write().unwrap();
+                    for repo in repos {
+                        repo_state.push(repo);
+                    }
+                })
+                .unwrap();
+
+                let _ = cx.spawn(async move |cx| {
+                    GLOBAL_RUNTIME.block_on(async move {
+                        let repo_finder = GitProjectFinder::builder(config.clone()).build();
+
+                        for dir in config.base_dir.clone() {
+                            let repos = repo_finder
+                                .find_git_projects(Path::new(&dir.clone()))
+                                .await
+                                .unwrap();
+
+                            cx.update_global(|state: &mut RepoState, _: &mut App| {
+                                let mut repo_state = state.repos.write().unwrap();
+                                for repo in repos {
+                                    repo_state.push(Repo {
+                                        name: repo.folder_name.clone(),
+                                        path: repo.full_path.to_string_lossy().to_string().clone(),
+                                        language: String::from("unknown"),
+                                        count: 0,
+                                    });
+                                }
+                            })
+                            .unwrap();
                         }
                     })
-                    .unwrap();
-                }
-            });
+                });
+            }
 
             Ok::<_, anyhow::Error>(())
         })

@@ -1,4 +1,6 @@
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitLauncherConfig {
     pub base_dir: Vec<String>,
     pub ignore_dirs: Vec<String>,
@@ -8,10 +10,9 @@ pub struct GitLauncherConfig {
 
 impl Default for GitLauncherConfig {
     fn default() -> Self {
-        // let home_dir = std::env::home_dir().unwrap();
+        let home_dir = std::env::home_dir().unwrap();
         Self {
-            // base_dir: vec![home_dir.to_string_lossy().to_string()],
-            base_dir: vec!["/Users/ranger/Desktop/project".to_string()],
+            base_dir: vec![home_dir.to_string_lossy().to_string()],
             ignore_dirs: vec![
                 "node_modules".to_string(),
                 "target".to_string(),

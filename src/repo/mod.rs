@@ -7,7 +7,9 @@ use gpui::{App, Global};
 pub use language::*;
 pub use search_repo::*;
 
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repo {
     pub name: String,
     pub path: String,
@@ -15,7 +17,7 @@ pub struct Repo {
     pub count: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoState {
     pub repos: Arc<RwLock<Vec<Repo>>>,
 }
