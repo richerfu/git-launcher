@@ -2,11 +2,17 @@
 
 A simple launcher for git project. Powered by [gpui](https://www.gpui.rs/) and [gpui-component](https://github.com/longbridge/gpui-component).
 
+https://github.com/user-attachments/assets/75cd5155-194c-4795-9477-f27c8ae0dfac
+
 ## Platform
 
 - [x] macOS
 - [ ] Windows
 - [ ] Linux
+
+## Usage
+
+Setup the application and you can use hotkey with `Option+P` to show application.
 
 ## Configuration
 
