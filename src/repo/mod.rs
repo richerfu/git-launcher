@@ -13,7 +13,7 @@ pub use search_repo::*;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Repo {
     pub name: String,
     pub path: String,
@@ -26,6 +26,14 @@ impl Hash for Repo {
         self.path.hash(state);
     }
 }
+
+impl PartialEq for Repo {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+
+impl Eq for Repo {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoState {
