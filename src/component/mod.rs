@@ -111,11 +111,12 @@ impl GitLauncher {
             let stats = analyzer.language().unwrap();
 
             let mut repo_state = repos.write().unwrap();
+            let mut repo = repo.clone();
 
-            let r = repo_state.iter_mut().find(|r| r.path == path).unwrap();
+            repo.language = stats.0;
+            repo.count += 1;
 
-            r.language = stats.0;
-            r.count += 1;
+            repo_state.insert(repo);
         })
         .join()
         .unwrap();

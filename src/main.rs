@@ -128,7 +128,7 @@ fn main() {
                         cx.update_global(|state: &mut RepoState, _: &mut App| {
                             let mut repo_state = state.repos.write().unwrap();
                             for repo in repos {
-                                repo_state.push(Repo {
+                                repo_state.insert(Repo {
                                     name: repo.folder_name.clone(),
                                     path: repo.full_path.to_string_lossy().to_string().clone(),
                                     language: String::from("unknown"),
@@ -155,36 +155,57 @@ fn main() {
                 cx.update_global(|state: &mut RepoState, _: &mut App| {
                     let mut repo_state = state.repos.write().unwrap();
                     for repo in repos {
-                        repo_state.push(repo);
+                        repo_state.insert(repo);
                     }
                 })
                 .unwrap();
 
-                let _ = cx.spawn(async move |cx| {
-                    GLOBAL_RUNTIME.block_on(async move {
-                        let repo_finder = GitProjectFinder::builder(config.clone()).build();
+                let new_repos = cx
+                    .background_spawn(async move {
+                        let ret: Result<Vec<Repo>, anyhow::Error> =
+                            GLOBAL_RUNTIME.block_on(async move {
+                                let mut new_repos = Vec::new();
+                                let repo_finder = GitProjectFinder::builder(config.clone()).build();
 
-                        for dir in config.base_dir.clone() {
-                            let repos = repo_finder
-                                .find_git_projects(Path::new(&dir.clone()))
-                                .await
-                                .unwrap();
-
-                            cx.update_global(|state: &mut RepoState, _: &mut App| {
-                                let mut repo_state = state.repos.write().unwrap();
-                                for repo in repos {
-                                    repo_state.push(Repo {
-                                        name: repo.folder_name.clone(),
-                                        path: repo.full_path.to_string_lossy().to_string().clone(),
-                                        language: String::from("unknown"),
-                                        count: 0,
-                                    });
+                                for dir in config.base_dir.clone() {
+                                    repo_finder
+                                        .find_git_projects(Path::new(&dir.clone()))
+                                        .await
+                                        .unwrap()
+                                        .into_iter()
+                                        .for_each(|re| {
+                                            new_repos.push(Repo {
+                                                name: re.folder_name.clone(),
+                                                path: re
+                                                    .full_path
+                                                    .to_string_lossy()
+                                                    .to_string()
+                                                    .clone(),
+                                                language: String::from("unknown"),
+                                                count: 0,
+                                            });
+                                        });
                                 }
-                            })
-                            .unwrap();
-                        }
+
+                                fs::write(
+                                    REPO_PATH.clone(),
+                                    serde_json::to_string(&new_repos).unwrap(),
+                                )
+                                .unwrap();
+                                Ok(new_repos)
+                            });
+
+                        ret
                     })
-                });
+                    .await?;
+
+                cx.update_global(|state: &mut RepoState, _: &mut App| {
+                    let mut repo_state = state.repos.write().unwrap();
+                    for repo in new_repos {
+                        repo_state.insert(repo);
+                    }
+                })
+                .unwrap();
             }
 
             Ok::<_, anyhow::Error>(())

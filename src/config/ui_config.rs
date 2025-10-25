@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 pub struct GitLauncherUIConfig {
     pub width: f32,
     pub height: f32,
-    pub max_scroll_height: f32,
 }
 
 impl Default for GitLauncherUIConfig {
@@ -12,7 +11,6 @@ impl Default for GitLauncherUIConfig {
         Self {
             width: 600.0,
             height: 60.0,
-            max_scroll_height: 600.0,
         }
     }
 }
